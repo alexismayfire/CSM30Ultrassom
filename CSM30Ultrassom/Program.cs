@@ -16,10 +16,10 @@ namespace CSM30Trabalho2
         {
             try
             {
-                //var gFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-A\g-1.txt";
-                //var hFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-A\H-1.txt";
-                var gFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-B\g-1.txt";
-                var hFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-B\H-1.txt";
+                var gFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-A\g-1.txt";
+                var hFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-A\H-1.txt";
+                //var gFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-B\g-1.txt";
+                //var hFile = @"C:\Users\alexismayfire\Desktop\CSM30\Trabalho 2\Imagem-B\H-1.txt";
 
 
                 var M = Matrix<double>.Build;
@@ -27,8 +27,8 @@ namespace CSM30Trabalho2
 
                 //int rows = 50816;
                 //int columns = 3600;
-                int rows = 10;
-                int columns = 6;
+                int rows = 50816;
+                int columns = 3600;
 
                 StreamReader sr = new StreamReader(gFile);
 
@@ -78,37 +78,46 @@ namespace CSM30Trabalho2
                 }
 
                 sr.Dispose();
-
-                Vector<double> f = V.Dense(rows, 0);
-                try
-                {
-                    var r0_temp = h.Multiply(f);
-                }
-                catch(Exception e)
-                {
-                    /* 
-                     * A exceção gerada é "Matrix dimensions must agree",
-                     * porque o operador é 10x6 e o operando 10x1.
-                     * Só que tem uma sobrecarga que aceita Vector, como rightSide.
-                     * E é exatamente o rightSide que aparece na mensagem, então wtf?? 
-                    */
-                    Console.WriteLine("Erro");
-                    Console.WriteLine(e.Message);
-                }
                 
                 /*
                  * Aqui seriam as operações de inicialização lá.
                 */
-                //var r0 = g.Subtract(h.Multiply(f));
-                //var p0 = h.Transpose().Multiply(r0);
+                var r = g;
+                Vector<double> r_aux;
+                var p = h.Transpose().Multiply(r);
+                Vector<double> p_aux;
 
-                //var r0_T = r0.ToRowMatrix();
-                //var alfa_upper = r0_T.Multiply(r0);
-                //var p0_T = p0.ToRowMatrix();
-                //var alfa_down = p0_T.Multiply(p0);
-                
-                //var alfa = alfa_upper / alfa_down;
+                Vector<double> f = V.Dense(columns);
+                Vector<double> f_aux = V.Dense(columns);
 
+                for(int i = 0; i < 15; i++)
+                {
+                    var r_T = r.ToRowMatrix();
+                    var alfa_upper = r_T.Multiply(r);
+                    var p_T = p.ToRowMatrix();
+                    var alfa_down = p_T.Multiply(p);
+
+                    var alfa = alfa_upper.PointwiseDivide(alfa_down);
+
+                    //f = f_aux;
+                    double alfa_scalar = alfa.Single();
+                    f_aux += f.Add(p.Multiply(alfa_scalar));
+                    var temp = h.Multiply(alfa_scalar);
+                    r_aux = r.Subtract(temp.Multiply(p));
+
+                    var r_auxT = r_aux.ToRowMatrix();
+                    var beta_upper = r_auxT.Multiply(r_aux);
+
+                    var beta = beta_upper.PointwiseDivide(alfa_upper);
+
+                    double beta_scalar = beta.Single();
+                    p_aux = h.Transpose().Multiply(r_aux);
+                    var pplus = p_aux.Add(p.Multiply(beta_scalar));
+                    p = pplus;
+                    r = r_aux;
+
+                }
+                 
                 Console.Read();
             }
             catch (Exception e)
