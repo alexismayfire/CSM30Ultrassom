@@ -40,7 +40,7 @@ namespace CSM30Trabalho2
                 StreamReader sr = new StreamReader(gFile);
 
                 var g = V.Dense(rows);
-                //Matrix<double> h;
+                Matrix<double> h;
 
                 try
                 {
@@ -73,7 +73,85 @@ namespace CSM30Trabalho2
 
                 try
                 {
-                    var f = CGNECall(hFile, rows, columns, g);
+                    //var f = CGNECall(hFile, rows, columns, g);
+                    Console.WriteLine(DateTime.Now);
+                    using (StreamReader reader = new StreamReader(File.OpenRead(hFile)))
+                    {
+                        var blasMatrix = new BlasMatrix(reader, columns);
+                        int i = 0;
+                        double[,] matrixTemp = new double[rows, columns];
+                        foreach (var element in blasMatrix.Records)
+                        {
+                            for (int j = 0; j < columns; j++)
+                            {
+                                matrixTemp[i, j] = element.getRow(0, j);
+                            }
+                            i++;
+                        }
+
+                        Console.WriteLine("Arquivo H lido");
+                        Console.WriteLine(DateTime.Now);
+
+                        Matrix<double> h;
+                        h = M.Sparse(SparseCompressedRowMatrixStorage<double>.OfArray(matrixTemp));
+                        //h = M.DenseOfArray(matrixTemp);
+                        /*
+                        * Usando Dense dobra o uso de memória (é feita uma cópia de matrixTemp)
+                        * 
+                        * h = M.Dense(DenseColumnMajorMatrixStorage<double>.OfArray(matrixTemp)) 
+                        * 
+                        */
+
+                        /*
+                        * Aqui são as operações de inicialização
+                        */
+                        Vector<double> f = V.Dense(columns);
+                        Vector<double> f_aux = V.Dense(columns);
+
+                        var r = g - h.Multiply(f);
+                        Vector<double> r_aux;
+                        //var hT = h.Transpose();
+                        // TODO: Essa transposição que está cagando! Provavelmente porque o tipo da matriz é Sparse
+                        var p = h.TransposeThisAndMultiply(r);
+                        Vector<double> p_aux;
+
+                        for (i = 0; i < 15; i++)
+                        {
+                            var r_T = r.ToRowMatrix();
+                            var alfa_upper = r_T.Multiply(r);
+                            var p_T = p.ToRowMatrix();
+                            var alfa_down = p_T.Multiply(p);
+
+                            var alfa = alfa_upper.PointwiseDivide(alfa_down);
+
+                            //f = f_aux;
+                            double alfa_scalar = alfa.Single();
+                            f_aux += f.Add(p.Multiply(alfa_scalar));
+                            f = f_aux;
+                            var temp = h.Multiply(alfa_scalar);
+                            r_aux = r.Subtract(temp.Multiply(p));
+
+                            var r_auxT = r_aux.ToRowMatrix();
+                            var beta_upper = r_auxT.Multiply(r_aux);
+
+                            var beta = beta_upper.PointwiseDivide(alfa_upper);
+                            /*
+                            Console.WriteLine(DateTime.Now);
+                            Console.WriteLine(GC.GetTotalMemory(true) / 1024 / 1024);
+                            Console.Read();
+                            Console.WriteLine("before matrix 2");
+                            */
+                            double beta_scalar = beta.Single();
+                            p_aux = h.TransposeThisAndMultiply(r_aux);
+                            var pplus = p_aux.Add(p.Multiply(beta_scalar));
+                            p = pplus;
+                            r = r_aux;
+
+                            Console.WriteLine(DateTime.Now);
+                            Console.WriteLine("iterou");
+
+                        }
+                    }
                     Console.Read();
                 }
                 catch (Exception e)
@@ -97,8 +175,10 @@ namespace CSM30Trabalho2
         {
             var M = Matrix<double>.Build;
             var V = Vector<double>.Build;
-            Matrix<double> h;
+        }
 
+        public static double[,] GenerateMatrix(String hFile, int rows, int columns)
+        {
             Console.WriteLine(DateTime.Now);
             using (StreamReader reader = new StreamReader(File.OpenRead(hFile)))
             {
@@ -113,71 +193,11 @@ namespace CSM30Trabalho2
                     }
                     i++;
                 }
-     
-                h = M.Sparse(SparseCompressedRowMatrixStorage<double>.OfArray(matrixTemp));
-                //h = M.Dense(DenseColumnMajorMatrixStorage<double>.OfArray(matrixTemp));
-                /*
-                 * Usando Dense dobra o uso de memória (é feita uma cópia de matrixTemp)
-                 * 
-                 * h = M.Dense(DenseColumnMajorMatrixStorage<double>.OfArray(matrixTemp)) 
-                 * 
-                 */
-                
+
                 Console.WriteLine("Arquivo H lido");
                 Console.WriteLine(DateTime.Now);
 
-                /*
-                * Aqui são as operações de inicialização
-                */
-                Vector<double> f = V.Dense(columns);
-                Vector<double> f_aux = V.Dense(columns);
-
-                var r = g - h.Multiply(f);
-                Vector<double> r_aux;
-                var hT = h.Transpose();
-                // TODO: Essa transposição que está cagando! Provavelmente porque o tipo da matriz é Sparse
-                var p = hT.Multiply(r);
-                Vector<double> p_aux;
-
-                for (i = 0; i < 15; i++)
-                {
-                    var r_T = r.ToRowMatrix();
-                    var alfa_upper = r_T.Multiply(r);
-                    var p_T = p.ToRowMatrix();
-                    var alfa_down = p_T.Multiply(p);
-
-                    var alfa = alfa_upper.PointwiseDivide(alfa_down);
-
-                    //f = f_aux;
-                    double alfa_scalar = alfa.Single();
-                    var tempVector = p.Multiply(alfa_scalar);
-                    f_aux += f.Add(p.Multiply(alfa_scalar));
-                    f = f_aux;
-                    var temp = h.Multiply(alfa_scalar);
-                    r_aux = r.Subtract(temp.Multiply(p));
-
-                    var r_auxT = r_aux.ToRowMatrix();
-                    var beta_upper = r_auxT.Multiply(r_aux);
-
-                    var beta = beta_upper.PointwiseDivide(alfa_upper);
-                    /*
-                    Console.WriteLine(DateTime.Now);
-                    Console.WriteLine(GC.GetTotalMemory(true) / 1024 / 1024);
-                    Console.Read();
-                    Console.WriteLine("before matrix 2");
-                    */
-                    double beta_scalar = beta.Single();
-                    p_aux = h.Transpose().Multiply(r_aux);
-                    var pplus = p_aux.Add(p.Multiply(beta_scalar));
-                    p = pplus;
-                    r = r_aux;
-
-                    Console.WriteLine(DateTime.Now);
-                    Console.WriteLine("iterou");
-
-                }
-
-                return f_aux;
+                return matrixTemp;
             }
         }
     }
